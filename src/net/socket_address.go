@@ -1,5 +1,6 @@
 package net
 
+import "fmt"
 
 const (
 	SOCKET_PROTOCOL_IPV4 = 1
@@ -19,6 +20,10 @@ func NewSocketAddress(host string, port, socket_protocol int) *SocketAddress {
 		port: port,
 		socket_protocol: socket_protocol,
 	}
+}
+
+func (this *SocketAddress) GetListenAddr() string {
+	return fmt.Sprintf("%s:%d", this.GetIp(), this.GetPort());
 }
 
 func (this *SocketAddress) GetIp() string {
