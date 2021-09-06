@@ -5,6 +5,24 @@ type MessageHead struct {
 	MessageLength uint16
 }
 
+type NetMessage struct {
+	PHead   *MessageHead
+	PBody interface{}
+}
+
+const MESSAGE_HEAD_LEN = 4
+
+
+func NewNetMessage(messageId, messageLen uint16, body interface{}) *NetMessage {
+	return &NetMessage{
+		PHead: &MessageHead{
+			MessageId: messageId,
+			MessageLength: messageLen,
+		},
+		PBody: body,
+	}
+}
+
 func DecodeHead(buf []byte, msgHead *MessageHead) bool {
 	if (len(buf) < 4) {
 		return false

@@ -2,6 +2,11 @@ package net
 
 import "net"
 
+type Server interface {
+	NewSession() TcpSession
+	Close()
+}
+
 type TcpService struct {
 	sock *TcpSocket
 	addr *SocketAddress
@@ -32,24 +37,16 @@ func (this *TcpService) CreateServer(host string, port int, max_connection int) 
 	return nil
 }
 
-func (this *TcpService) Loop() {
+func (this *TcpService) Loop(srv Server) {
 
 	for {
 		conn, err := this.sock.Accept()
 		if err != nil {
-			if ne, ok := e.(net.Error); ok && ne.Temporary() {
+			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				continue
 			}
 			return
 		}
-		go this.onNewConnection(conn)
-	}
-}
-
-func (this *TcpService) onNewConnection(conn net.Conn) {
-	defer conn.Close()
-
-	for {
-		buf
+		NewTcpReactor(srv.NewSession()).Loop(conn)
 	}
 }
