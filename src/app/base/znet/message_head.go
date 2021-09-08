@@ -6,17 +6,18 @@ type MessageHead struct {
 }
 
 type NetMessage struct {
-	Fd        int
+	NetId        int64
 	MessageId uint16
-	Data interface{}
+	Data []byte
+	DataSend interface{}
 }
 
 const MESSAGE_HEAD_LEN = 4
 
 
-func NewNetMessage(messageId uint16, fd int, data []byte) *NetMessage {
+func NewNetMessage(messageId uint16, id int64, data []byte) *NetMessage {
 	return &NetMessage{
-		Fd: fd,
+		NetId: id,
 		MessageId: messageId,
 		Data: data,
 	}

@@ -1,6 +1,7 @@
 package znet
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -30,12 +31,13 @@ type TcpReactor struct {
 func NewTcpReactor(serv *TcpServer) *TcpReactor {
 	return &TcpReactor{
 		tcp_server:       serv,
+		state: CONNECTION_STATE_INIT,
 	}
 }
 
 
-func (this *TcpReactor) GetFd() int {
-	return this.tcp_conn.fd
+func (this *TcpReactor) GetNetId() int64 {
+	return this.tcp_conn.id
 }
 
 func (this *TcpReactor) LocalAddress() string {
@@ -63,27 +65,31 @@ func (this *TcpReactor) Stop() {
 	go func() {
 		this.wg.Wait()
 
-		this.tcp_server.OnClose(this)
+		this.tcp_server.onClose(this)
 
 		close(this.writeMessageQueue)
 		close(this.ReadMessageQueue)
 
 		atomic.StoreInt32(&this.state, CONNECTION_STATE_INIT)
+
+		fmt.Printf("reactor closed \n")
 	}()
 }
 
-func (this *TcpReactor) Loop(conn net.Conn) bool {
+func (this *TcpReactor) Loop(id int64, conn net.Conn) bool {
+
 	if !atomic.CompareAndSwapInt32(&this.state, CONNECTION_STATE_INIT, CONNECTION_STATE_CONNECTED) {
 		return false
 	}
 
-	this.tcp_conn = NewConnection(conn, this,20, 60)
+
+	this.tcp_conn = NewConnection(id, conn, this,600, 600)
 	this.CloseChan = make(chan struct{})
 
-	this.writeMessageQueue = make(chan *NetMessage, 102400)
-	this.ReadMessageQueue = make(chan *NetMessage, 102400)
+	this.writeMessageQueue = make(chan *NetMessage, 10240)
+	this.ReadMessageQueue = make(chan *NetMessage, 10240)
 
-	this.tcp_server.OnConnect(this)
+	this.tcp_server.onConnect(this)
 
 	// 写
 	this.wg.Add(1)
@@ -104,7 +110,7 @@ func (this *TcpReactor) Loop(conn net.Conn) bool {
 func (this *TcpReactor) recvPacket(messageId uint16, messageLength uint16, messageBuf []byte) {
 	// 通过messageId 创建对应的消息， 然后
 
-	pack := NewNetMessage(messageId, this.tcp_conn.fd, messageBuf)
+	pack := NewNetMessage(messageId, this.tcp_conn.id, messageBuf)
 	select {
 	case this.ReadMessageQueue <- pack:
 	case <- this.CloseChan:
@@ -117,19 +123,24 @@ func (this *TcpReactor) dispatchMessage() {
 		case msg := <- this.ReadMessageQueue:
 
 			// 将字节数组 转化为 消息结构
-			this.tcp_server.OnRecvMessage(this, msg)
+			this.tcp_server.onRecvMessage(this, msg)
 		case <-this.CloseChan:
+			more = false
+		case <-this.tcp_server.closeChan:
 			more = false
 		}
 	}
+	fmt.Printf("dispatchMessage exit \n")
 	this.wg.Done()
+	this.Stop()
 }
 
 func (this *TcpReactor) SendMessage(messageId uint16, data interface{}) bool {
 	msg := &NetMessage{
-		Fd: 0,
+		NetId: 0,
 		MessageId: messageId,
-		Data: data,
+		Data: nil,
+		DataSend: data,
 	}
 	select {
 	case this.writeMessageQueue <- msg:

@@ -3,33 +3,27 @@ package znet
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"time"
 	"github.com/golang/protobuf/proto"
 )
-//<property name="MaxReadMsgSize">65536</property>  <!-- 接收包的最大长度 -->
-//30     <property name="ReadMsgQueueSize">10240</property>  <!-- 接收包的缓存队列长度 -->
-//31     <property name="ReadTimeOut">600</property>  <!-- 接收包的超时(second) -->
-//32     <property name="MaxWriteMsgSize">65536</property> <!-- 发送包的最大长度 -->
-//33     <property name="WriteMsgQueueSize">10240</property> <!-- 发送包的缓存队列长度  -->
-//34     <property name="WriteTimeOut">600</property>  <!-- 发送包的超时(second) -->
 
 const MAX_READ_MESSAGE_SIZE = 65535
 
 const MESSAGE_HEAD_LENGTH = 4 // msg_id(2) + message_length(2)
 
-const DEFAULT_READ_TIMEOUT_SEC = 60 // 60秒没有数据到来， 超时处理
+const DEFAULT_READ_TIMEOUT_SEC = 5 // 60秒没有数据到来， 超时处理
 const DEFAULT_WRITE_TIMEOUT_SEC = 10
 
-var ErrorMessageNotEnough = errors.New("message not enough")
 var ErrorMessageOverflow = errors.New("message over flow")
 var ErrorInvalidMessageType = errors.New("invalid message type")
 var ErrorMessaegWriteOverFlow = errors.New("message write overflow")
 
 
 type TcpConnection struct {
-	fd     int
+	id     int64
 	conn   net.Conn
 	remote_addr string
 	local_addr string
@@ -42,19 +36,23 @@ type TcpConnection struct {
 	readTimeout time.Duration
 }
 
-func NewConnection(conn net.Conn, reactor *TcpReactor, write_timeout_sec int32, read_timeout_sec int32) *TcpConnection {
+func NewConnection(id int64, conn net.Conn, reactor *TcpReactor, write_timeout_sec int32, read_timeout_sec int32) *TcpConnection {
 
-	s, _ := conn.(*net.TCPConn);
-	f, _ := s.File()
-	var fd int = int(f.Fd())
+	// only work on linux
+	if s, ok := conn.(*net.TCPConn);ok {
+		f, err := s.File()
+		if err == nil {
+			id = int64(f.Fd())
+		}
+	}
 
 	c := &TcpConnection{
-		fd: fd,
+		id: id,
 		conn: conn,
 		remote_addr: conn.RemoteAddr().String(),
 		local_addr: conn.LocalAddr().String(),
 		messageHead: make([]byte, MESSAGE_HEAD_LENGTH, MESSAGE_HEAD_LENGTH),
-		reactor: nil,
+		reactor: reactor,
 	}
 
 	if write_timeout_sec > 0 {
@@ -69,12 +67,12 @@ func NewConnection(conn net.Conn, reactor *TcpReactor, write_timeout_sec int32, 
 		c.readTimeout = time.Duration(DEFAULT_READ_TIMEOUT_SEC) * time.Second
 	}
 
+
 	return c
 }
 
 func (this *TcpConnection) Close() error {
 	err := this.conn.Close()
-	this.reactor = nil
 	return err
 }
 
@@ -85,7 +83,7 @@ func (this *TcpConnection) WriteLoop() {
 	head_buf := make([]byte, MESSAGE_HEAD_LEN)
 	data_buf := make([]byte, max_size - MESSAGE_HEAD_LEN)
 
-	for {
+	for this.reactor != nil {
 		select {
 		case msg := <- this.reactor.writeMessageQueue:
 			length, data, err := Marshal(msg, max_size, head_buf, data_buf)
@@ -130,6 +128,7 @@ func (this *TcpConnection) WriteLoop() {
 		}
 	}
 exit:
+	fmt.Printf("WriteLoop exit \n")
 	this.reactor.wg.Done()
 }
 
@@ -143,7 +142,7 @@ func marshalWithBytes(pb proto.Message, data []byte) ([]byte, error) {
 func Marshal(message *NetMessage, max_size int, head_buff, data_buff []byte) (lengRet int, dataRet []byte, errRet error) {
 
 	var data []byte
-	switch v := message.Data.(type) {
+	switch v := message.DataSend.(type) {
 	case []byte:
 		data = v;
 	case proto.Message:
@@ -169,7 +168,6 @@ func Marshal(message *NetMessage, max_size int, head_buff, data_buff []byte) (le
 
 func (this *TcpConnection) ReadLoop() {
 	reader := bufio.NewReader(this.conn)
-
 	for {
 		err := this.conn.SetReadDeadline(time.Now().Add(this.readTimeout))
 		if err != nil {
@@ -177,10 +175,12 @@ func (this *TcpConnection) ReadLoop() {
 		}
 
 		if err := this.read(reader); err != nil {
+			fmt.Printf("read loop err: %d | %s \n", this.id, err.Error())
 			goto exit
 		}
 	}
 exit:
+	fmt.Printf("ReadLoop exit \n")
 	this.reactor.Stop()
 	this.reactor.wg.Done()
 }
@@ -196,26 +196,26 @@ func (this *TcpConnection) write(msg []byte) bool {
 }
 
 func (this *TcpConnection) read(r io.Reader) error {
-	_, err := io.ReadFull(r, this.messageHead)
+	readSize, err := io.ReadFull(r, this.messageHead)
 	if err != nil {
+		fmt.Printf("read error: %s (%d) \n", err.Error(), readSize)
 		return err
 	}
 
-	messageId := DecodeUint16(this.messageHead[0:2])
+	messageId := DecodeUint16(this.messageHead[:2])
 	messageSize := DecodeUint16(this.messageHead[2:])
 
-	if messageSize < MESSAGE_HEAD_LENGTH {
-		return ErrorMessageNotEnough
-	}
-	if messageSize > MAX_READ_MESSAGE_SIZE {
+	if messageSize + MESSAGE_HEAD_LENGTH > MAX_READ_MESSAGE_SIZE {
 		return ErrorMessageOverflow
 	}
 
-	dataBuf := make([]byte, messageSize - MESSAGE_HEAD_LEN, messageSize - MESSAGE_HEAD_LEN)
+	dataBuf := make([]byte, messageSize, messageSize)
 	_, err = io.ReadFull(r, dataBuf)
 	if err != nil {
+		fmt.Printf("read error222: %s \n", err.Error())
 		return err
 	}
+
 	this.reactor.recvPacket(messageId, messageSize, dataBuf)
 
 	return nil

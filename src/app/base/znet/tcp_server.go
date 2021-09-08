@@ -1,18 +1,22 @@
 package znet
 
-import "fmt"
-
 type LogicServer interface {
-	OnConnect(fd int)
+	OnConnect(net_id int64, remoteAddr string)
+	OnDisConnect(net_id int64, remoteAddr string)
+	OnMessage(net_id int64, messageId uint16, data []byte)
 }
 
 type TcpServer struct {
 	service *TcpService
+	logicServer LogicServer
+	closeChan chan struct{}
 }
 
-func NewTcpServer() *TcpServer {
+func NewTcpServer(logicServ LogicServer) *TcpServer {
 	return &TcpServer{
 		service: NewTcpService(),
+		logicServer: logicServ,
+		closeChan: make(chan struct{}),
 	}
 }
 
@@ -24,16 +28,27 @@ func (this *TcpServer) Loop() {
 	this.service.Loop(this)
 }
 
-func (this *TcpServer) OnConnect(reactor *TcpReactor) {
-	fmt.Printf("OnConnect (%d)\n", reactor.GetFd())
+func (this *TcpServer) GetListenAddress() string {
+	return this.service.GetListenAddr()
 }
 
-func (this *TcpServer) OnClose(reactor *TcpReactor) {
-	fmt.Printf("OnClose (%d)\n", reactor.GetFd())
+func (this *TcpServer) Shutdown() {
+	// 通知监听程序关闭
+	this.service.Shutdown()
+	// 通知 reactor 关闭
+	close(this.closeChan)
 }
 
-func (this *TcpServer) OnRecvMessage(reactor *TcpReactor, message *NetMessage) {
-	fmt.Printf("OnRecvMessage (%d)\n", reactor.GetFd())
+func (this *TcpServer) onConnect(reactor *TcpReactor) {
+	this.logicServer.OnConnect(reactor.GetNetId(), reactor.tcp_conn.remote_addr)
+}
+
+func (this *TcpServer) onClose(reactor *TcpReactor) {
+	this.logicServer.OnDisConnect(reactor.GetNetId(), reactor.tcp_conn.remote_addr)
+}
+
+func (this *TcpServer) onRecvMessage(reactor *TcpReactor, message *NetMessage) {
+	this.logicServer.OnMessage(reactor.GetNetId(), message.MessageId, message.Data)
 }
 
 func (this *TcpServer) SendMessage(reactor *TcpReactor, messageId uint16, data interface{}) {
