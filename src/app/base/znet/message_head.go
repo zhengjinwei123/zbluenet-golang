@@ -39,7 +39,7 @@ func EncodeHead(buf []byte, message_id uint16, message_size uint16) bool {
 		return false
 	}
 
-	EncodeUint16(message_id, buf[0:])
+	EncodeUint16(message_id, buf[0:2])
 	EncodeUint16(message_size, buf[2:])
 
 	return true

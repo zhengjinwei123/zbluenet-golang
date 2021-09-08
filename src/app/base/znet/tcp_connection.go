@@ -155,15 +155,15 @@ func Marshal(message *NetMessage, max_size int, head_buff, data_buff []byte) (le
 		return 0, nil, ErrorInvalidMessageType
 	}
 
-	length := len(data) + MESSAGE_HEAD_LEN
+	msgSize := len(data)
 
-	if length > max_size {
+	if (msgSize + MESSAGE_HEAD_LEN) > max_size {
 		return 0, nil, ErrorMessaegWriteOverFlow
 	}
 
-	EncodeHead(head_buff, message.MessageId, uint16(length))
+	EncodeHead(head_buff, message.MessageId, uint16(msgSize))
 
-	return length, data, nil
+	return msgSize + MESSAGE_HEAD_LEN, data, nil
 }
 
 func (this *TcpConnection) ReadLoop() {
