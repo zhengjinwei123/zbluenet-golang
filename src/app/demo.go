@@ -24,6 +24,7 @@ func (this *ZoneServer) OnDisConnect(fd int64, remoteAddr string) {
 }
 
 
+// 这个接口是并发的， 需要把消息转到channel ， 然后再处理比较好，
 func (this *ZoneServer) OnMessage(fd int64,  messageId uint16, data []byte) {
 	fmt.Printf("OnMessage [%d] [%d]\n", fd, messageId)
 
