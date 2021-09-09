@@ -1,16 +1,16 @@
 package znet
 
 type NetIdAllocator struct {
-	id int64
+	id uint32
 }
 
-func NewNetIdAllocator() *NetIdAllocator {
+func NewNetIdAllocator(init_id uint32) *NetIdAllocator {
 	return &NetIdAllocator{
 		id: 0,
 	}
 }
 
-func (this *NetIdAllocator) NextId() int64 {
+func (this *NetIdAllocator) NextId() uint32 {
 	if this.id < 0 {
 		this.id = 0
 	}

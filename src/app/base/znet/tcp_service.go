@@ -25,7 +25,7 @@ func NewTcpService() *TcpService {
 		running: false,
 		max_con: -1,
 		con_num: 0,
-		net_id_allocator: NewNetIdAllocator(),
+		net_id_allocator: NewNetIdAllocator(0),
 	}
 }
 

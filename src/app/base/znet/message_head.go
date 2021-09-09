@@ -45,6 +45,14 @@ func EncodeHead(buf []byte, message_id uint16, message_size uint16) bool {
 	return true
 }
 
+func EncodeUint8(n uint8, buf []byte) {
+	buf[0] = byte(n)
+}
+
+func DecodeUint8(data []byte) uint8 {
+	return uint8(data[0])
+}
+
 // big endian
 func DecodeUint16(data []byte) uint16 {
 	return (uint16(data[0]) << 8) | (uint16(data[1]))
@@ -73,15 +81,15 @@ func EncodeUint32(n uint32, buf []byte)  {
 }
 
 // big endian
-func DecodeUint64(data []byte) uint32 {
-	return (uint32(data[0]) << 56) |
-		(uint32(data[1]) << 48) |
-		(uint32(data[2]) << 40) |
-		(uint32(data[3]) << 32) |
-		(uint32(data[4]) << 24) |
-		(uint32(data[5]) << 16) |
-		(uint32(data[6]) << 8) |
-		(uint32(data[7]))
+func DecodeUint64(data []byte) uint64 {
+	return (uint64(data[0]) << 56) |
+		(uint64(data[1]) << 48) |
+		(uint64(data[2]) << 40) |
+		(uint64(data[3]) << 32) |
+		(uint64(data[4]) << 24) |
+		(uint64(data[5]) << 16) |
+		(uint64(data[6]) << 8) |
+		(uint64(data[7]))
 }
 
 //big endian

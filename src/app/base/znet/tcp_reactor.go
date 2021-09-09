@@ -76,7 +76,7 @@ func (this *TcpReactor) Stop() {
 	}()
 }
 
-func (this *TcpReactor) Loop(id int64, conn net.Conn) bool {
+func (this *TcpReactor) Loop(id uint32, conn net.Conn) bool {
 
 	if !atomic.CompareAndSwapInt32(&this.state, CONNECTION_STATE_INIT, CONNECTION_STATE_CONNECTED) {
 		return false

@@ -19,11 +19,11 @@ const DEFAULT_WRITE_TIMEOUT_SEC = 10
 
 var ErrorMessageOverflow = errors.New("message over flow")
 var ErrorInvalidMessageType = errors.New("invalid message type")
-var ErrorMessaegWriteOverFlow = errors.New("message write overflow")
+var ErrorMessageWriteOverFlow = errors.New("message write overflow")
 
 
 type TcpConnection struct {
-	id     int64
+	id     uint32
 	conn   net.Conn
 	remote_addr string
 	local_addr string
@@ -36,13 +36,13 @@ type TcpConnection struct {
 	readTimeout time.Duration
 }
 
-func NewConnection(id int64, conn net.Conn, reactor *TcpReactor, write_timeout_sec int32, read_timeout_sec int32) *TcpConnection {
+func NewConnection(id uint32, conn net.Conn, reactor *TcpReactor, write_timeout_sec int32, read_timeout_sec int32) *TcpConnection {
 
 	// only work on linux
 	if s, ok := conn.(*net.TCPConn);ok {
 		f, err := s.File()
 		if err == nil {
-			id = int64(f.Fd())
+			id = uint32(f.Fd())
 		}
 	}
 
@@ -158,7 +158,7 @@ func Marshal(message *NetMessage, max_size int, head_buff, data_buff []byte) (le
 	msgSize := len(data)
 
 	if (msgSize + MESSAGE_HEAD_LEN) > max_size {
-		return 0, nil, ErrorMessaegWriteOverFlow
+		return 0, nil, ErrorMessageWriteOverFlow
 	}
 
 	EncodeHead(head_buff, message.MessageId, uint16(msgSize))
