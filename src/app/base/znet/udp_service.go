@@ -14,7 +14,6 @@ type udpService struct {
 	addr *SocketAddress
 	net_id_allocator *NetIdAllocator
 
-	running bool
 	connections map[uint32]*udpConnection
 	server *UdpServer
 
@@ -28,7 +27,6 @@ func NewUdpService() *udpService {
 		net_id_allocator: NewNetIdAllocator(MIN_NET_ID),
 		socket: nil,
 		addr: nil,
-		running: false,
 		connections: make(map[uint32]*udpConnection),
 		server: nil,
 		conMutex: &sync.Mutex{},
@@ -79,7 +77,6 @@ func (this *udpService) stop(shutdownWg *sync.WaitGroup) {
 }
 
 func (this *udpService) Shutdown(shutdownWg *sync.WaitGroup) {
-	this.running = false
 	this.stop(shutdownWg)
 }
 
