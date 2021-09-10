@@ -181,8 +181,8 @@ func (this *TcpConnection) ReadLoop() {
 	}
 exit:
 	fmt.Printf("ReadLoop exit \n")
-	this.reactor.Stop()
 	this.reactor.wg.Done()
+	this.reactor.Stop()
 }
 
 func (this *TcpConnection) write(msg []byte) bool {

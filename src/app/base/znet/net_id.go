@@ -6,7 +6,7 @@ type NetIdAllocator struct {
 
 func NewNetIdAllocator(init_id uint32) *NetIdAllocator {
 	return &NetIdAllocator{
-		id: 0,
+		id: init_id,
 	}
 }
 

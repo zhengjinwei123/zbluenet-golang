@@ -1,18 +1,23 @@
 package znet
 
+import (
+	"encoding/binary"
+	"fmt"
+)
+
 // 安全UDP 消息包头
 
-const UDP_MESSAGE_TYPE_ACK = 1
-const UDP_MESSAGE_TYPE_MESSAGE = 0
+const UDP_MESSAGE_TYPE_ACK = 0
+const UDP_MESSAGE_TYPE_MESSAGE = 1
 
-const UDP_PACKET_HEAD_SIZE = 21
+const UDP_PACKET_HEAD_SIZE = 22
 
 type udpBuffer struct {
 	DataSize 			  uint16 // 报文大小 字节 2
 	SessionId 			  uint32 // 会话ID 用来标识身份 4
 	SN        			  uint32 // 包体的序号， 用来保证顺序 4
 	Time                  uint64 // 发送时间戳, 用来控制超时重传 8
-	MessageType           uint8  // 协议类型 ACK ， data 1
+	MessageType           uint16  // 协议类型 ACK ， data 1
 	MessageId             uint16 // 消息ID 2
 	Data                  []byte // 业务报文数据
 
@@ -23,7 +28,7 @@ type udpBuffer struct {
 
 
 // 构建请求报文
-func NewRequestUdpBuffer(session_id uint32, sn uint32, message_type uint8, message_id uint16, data []byte) *udpBuffer {
+func NewRequestUdpBuffer(session_id uint32, sn uint32, message_type uint16, message_id uint16, data []byte) *udpBuffer {
 	return &udpBuffer{
 		DataSize: uint16(len(data)),
 		Data: data,
@@ -80,8 +85,8 @@ func (this *udpBuffer) Encode(is_ack bool) []byte {
 	timeBuf := make([]byte, 8, 8)
 	EncodeUint64(this.Time, timeBuf)
 
-	messageTypeBuf := make([]byte, 1, 1)
-	EncodeUint8(this.MessageType, messageTypeBuf)
+	messageTypeBuf := make([]byte, 2, 2)
+	EncodeUint16(this.MessageType, messageTypeBuf)
 
 	messageIdBuf := make([]byte, 2, 2)
 	EncodeUint16(this.MessageId, messageIdBuf)
@@ -102,7 +107,7 @@ func (this *udpBuffer) Encode(is_ack bool) []byte {
 	index += 8
 	copy(data[index:], messageTypeBuf)
 
-	index += 1
+	index += 2
 	copy(data[index:], messageIdBuf)
 
 	if is_ack == false {
@@ -121,7 +126,8 @@ func (this *udpBuffer) DeCode() bool {
 	bufferSize := len(this.buffer)
 
 	if bufferSize >= 2 {
-		this.DataSize = DecodeUint16(this.buffer[index:])
+		this.DataSize = binary.LittleEndian.Uint16(this.buffer[index:])
+
 		index += 2
 
 		if bufferSize != (int(this.DataSize) + UDP_PACKET_HEAD_SIZE) {
@@ -131,28 +137,31 @@ func (this *udpBuffer) DeCode() bool {
 		return false
 	}
 
-	this.SessionId = DecodeUint32(this.buffer[index:])
+	this.SessionId = binary.LittleEndian.Uint32(this.buffer[index:])
 	index += 4
 
-	this.SN = DecodeUint32(this.buffer[index:])
+	this.SN = binary.LittleEndian.Uint32(this.buffer[index:])
 	index += 4
 
-	this.Time = DecodeUint64(this.buffer[index:])
+	this.Time = binary.LittleEndian.Uint64(this.buffer[index:])
 	index += 8
 
-	this.MessageType = DecodeUint8(this.buffer[index:])
-	index += 1
+	this.MessageType = binary.LittleEndian.Uint16(this.buffer[index:])
+	index += 2
 
-	this.MessageId = DecodeUint16(this.buffer[index:])
+	this.MessageId = binary.LittleEndian.Uint16(this.buffer[index:])
 
 
 	if this.MessageType != UDP_MESSAGE_TYPE_ACK {
 		index += 2
 
-		data := make([]byte, this.DataSize, this.DataSize)
+		this.Data = make([]byte, this.DataSize, this.DataSize)
 		// 将 buffer 里 剩余的数据复制到data, 得到业务数据
-		copy(data, this.buffer[index:])
+		copy(this.Data, this.buffer[index:])
 	}
+
+	fmt.Printf("msgid: %d  msgtype: %d time: %d sessionid: %d sn: %d data:%v\n",
+		this.MessageId, this.MessageType, this.Time, this.SessionId, this.SN, string(this.Data))
 
 	return true
 }

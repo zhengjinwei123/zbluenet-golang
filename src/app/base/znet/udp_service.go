@@ -86,8 +86,8 @@ func (this *udpService) Loop() {
 		case <-this.closeChan:
 			goto exit
 		default:
-			data := make([]byte, 65535)
-			n, addr, err := this.socket.Accept(data)
+			buf := make([]byte, 65535)
+			n, addr, err := this.socket.Accept(buf)
 			if err != nil {
 				// 超时
 				if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -97,7 +97,11 @@ func (this *udpService) Loop() {
 				continue
 			}
 
-			go this.handleConn(addr, data, n)
+			if n <= 0 {
+				continue
+			}
+
+			go this.handleConn(addr, buf, n)
 		}
 	}
 exit:
@@ -106,7 +110,10 @@ exit:
 }
 
 
-func (this *udpService) handleConn(addr *net.UDPAddr, buf []byte, size int) {
+func (this *udpService) handleConn(addr *net.UDPAddr, data []byte, size int) {
+
+	buf := make([]byte, size, size)
+	copy(buf, data[:size])
 
 	if size < UDP_PACKET_HEAD_SIZE {
 		return
@@ -116,7 +123,6 @@ func (this *udpService) handleConn(addr *net.UDPAddr, buf []byte, size int) {
 	if buffer.isFull == false {
 		return
 	}
-
 	// 获取 SessionId
 	if buffer.SessionId < MIN_NET_ID {
 		// 如果 sessionid < MIN_NET_ID , 说明是连接请求， 分配一个net_id, 然后放到包体中
@@ -137,13 +143,24 @@ func (this *udpService) createConnection(addr *net.UDPAddr, session_id uint32) {
 		return
 	}
 	this.conMutex.Lock()
-	this.connections[session_id] = NewUdpConnection(addr, session_id, nil)
+	this.connections[session_id] = NewUdpConnection(addr, session_id, this)
 	this.conMutex.Unlock()
 
 	this.server.onConnect(session_id, addr.String())
 }
 
 func (this *udpService) dispatchMessage(buffer *udpBuffer) {
+
+	if this.server == nil {
+		fmt.Printf("server is nil \n")
+		return
+	}
+
+	if buffer == nil {
+		fmt.Printf("buffer is nil \n")
+		return
+	}
+
 	this.server.onMessage(buffer.SessionId, buffer.MessageId, buffer.Data)
 }
 

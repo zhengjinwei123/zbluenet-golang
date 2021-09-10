@@ -61,10 +61,10 @@ func (this *udpConnection) sendLoop() {
 			this.send(pack)
 
 		case <-this.closeChan:
-			goto exit
+			break
 		}
 	}
-exit:
+
 	this.wg.Done()
 	fmt.Printf("udpConnection sendLoop exit \n")
 }
@@ -77,10 +77,9 @@ func (this *udpConnection) checkOutTime() {
 		case <-timer.C:
 			this.handleTimeoutPackage()
 		case <-this.closeChan:
-			goto exit
+			break
 		}
 	}
-exit:
 	this.wg.Done()
 	fmt.Printf("checkOutTime exit \n")
 }
@@ -122,7 +121,8 @@ func (this *udpConnection) close() {
 	close(this.closeChan)
 
 	go func() {
-		this.wg.Done()
+		this.wg.Wait()
+
 		this.service.removeClient(this.sessionId)
 
 		close(this.sendMsgQueue)
