@@ -1,22 +1,29 @@
-package sudp
+package znet
 
-type LogicServer interface {
+import "sync"
+
+type UdpLogicServer interface {
 	OnConnect(sessionId uint32, addr string)
+	OnDisconnect(sessionId uint32, addr string)
 	OnMessage(sessionId uint32, messageId uint16, data []byte)
 }
 
 type UdpServer struct {
 	service *udpService
-	logicServer LogicServer
-	closeChan chan struct{}
+	logicServer UdpLogicServer
+	wg *sync.WaitGroup
 }
 
-func NewUdpServer(logicServ LogicServer) *UdpServer {
+func NewUdpServer(logicServ UdpLogicServer) *UdpServer {
 	return &UdpServer{
 		service: NewUdpService(),
 		logicServer: logicServ,
-		closeChan: make(chan struct{}),
+		wg: &sync.WaitGroup{},
 	}
+}
+
+func (this *UdpServer) GetListenAddress() string {
+	return this.service.GetListenAddr()
 }
 
 func (this *UdpServer) CreateServer(host string, port int) error {
@@ -28,12 +35,17 @@ func (this *UdpServer) Loop() {
 }
 
 func (this *UdpServer) Shutdown() {
-	this.service.Shutdown()
-	close(this.closeChan)
+	this.wg.Add(1)
+	this.service.Shutdown(this.wg)
+	this.wg.Wait()
 }
 
 func (this *UdpServer) onConnect(sessionId uint32, addr string) {
 	this.logicServer.OnConnect(sessionId, addr)
+}
+
+func (this *UdpServer) onClose(sessionId uint32, addr string) {
+	this.logicServer.OnDisconnect(sessionId, addr)
 }
 
 // 这个接口是并发的

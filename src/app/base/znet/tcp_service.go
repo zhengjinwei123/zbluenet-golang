@@ -3,6 +3,7 @@ package znet
 import (
 	"fmt"
 	"net"
+	"sync"
 )
 
 
@@ -12,20 +13,19 @@ type TcpService struct {
 	addr *SocketAddress
 	max_con int
 	net_id_allocator *NetIdAllocator
+	wg *sync.WaitGroup
 
 	con_num int
-
-	running bool
 }
 
 func NewTcpService() *TcpService {
 	return &TcpService{
 		sock: nil,
 		addr: nil,
-		running: false,
 		max_con: -1,
 		con_num: 0,
 		net_id_allocator: NewNetIdAllocator(0),
+		wg: &sync.WaitGroup{},
 	}
 }
 
@@ -54,13 +54,14 @@ func (this *TcpService) stop() {
 		return
 	}
 	fmt.Printf("tcp service listen socket close\n")
+	this.wg.Add(1)
 	_ = this.sock.CloseSocket()
 	this.sock = nil
+	this.wg.Wait()
 }
 
 func (this *TcpService) Shutdown() {
 	fmt.Printf("tcp service ready shutdown \n")
-	this.running = false
 	this.stop()
 }
 
@@ -69,18 +70,17 @@ func (this *TcpService) GetListenAddr() string {
 }
 
 func (this *TcpService) Loop(srv *TcpServer) {
-	this.running = true
 
-	for this.running == true {
-
+	for {
 		conn, err := this.sock.Accept()
 		if err != nil {
 
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				continue
 			}
-			fmt.Printf("tcp service loop err:%s \n", err.Error())
-			return
+
+			this.wg.Done()
+			break
 		}
 
 		if this.max_con > 0 && this.con_num >= this.max_con {

@@ -1,8 +1,8 @@
-package sudp
+package znet
 
 import (
-	"app/base/znet"
 	"net"
+	"time"
 )
 
 //type MessageCallback func(addr *net.UDPAddr, read_size int, data []byte)
@@ -15,7 +15,7 @@ func NewUdpSocket() *udpSocket {
 	return &udpSocket{}
 }
 
-func (this *udpSocket) PassiveOpen(addr *znet.SocketAddress) error {
+func (this *udpSocket) PassiveOpen(addr *SocketAddress) error {
 	addr1, err := net.ResolveUDPAddr("udp", addr.GetListenAddr())
 	if err != nil {
 		return err
@@ -34,6 +34,8 @@ func (this *udpSocket) CloseSocket() error {
 }
 
 func (this *udpSocket) Accept(data []byte) (int, *net.UDPAddr, error) {
+	_ = this.listenConn.SetReadDeadline(time.Now().Add(time.Duration(5) * time.Second))
+
 	return this.listenConn.ReadFromUDP(data)
 }
 

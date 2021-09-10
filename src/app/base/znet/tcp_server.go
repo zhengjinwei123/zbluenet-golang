@@ -1,18 +1,18 @@
 package znet
 
-type LogicServer interface {
-	OnConnect(net_id int64, remoteAddr string)
-	OnDisConnect(net_id int64, remoteAddr string)
-	OnMessage(net_id int64, messageId uint16, data []byte)
+type TcpLogicServer interface {
+	OnConnect(net_id uint32, remoteAddr string)
+	OnDisConnect(net_id uint32, remoteAddr string)
+	OnMessage(net_id uint32, messageId uint16, data []byte)
 }
 
 type TcpServer struct {
 	service *TcpService
-	logicServer LogicServer
+	logicServer TcpLogicServer
 	closeChan chan struct{}
 }
 
-func NewTcpServer(logicServ LogicServer) *TcpServer {
+func NewTcpServer(logicServ TcpLogicServer) *TcpServer {
 	return &TcpServer{
 		service: NewTcpService(),
 		logicServer: logicServ,

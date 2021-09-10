@@ -1,8 +1,4 @@
-package sudp
-
-import (
-	"app/base/znet"
-)
+package znet
 
 // 安全UDP 消息包头
 
@@ -73,22 +69,22 @@ func (this *udpBuffer) Encode(is_ack bool) []byte {
 	data := make([]byte, UDP_PACKET_HEAD_SIZE + this.DataSize)
 
 	dataSizeBuf := make([]byte, 2, 2)
-	znet.EncodeUint16(this.DataSize, dataSizeBuf)
+	EncodeUint16(this.DataSize, dataSizeBuf)
 
 	sessionIdBuf := make([]byte, 4, 4)
-	znet.EncodeUint32(this.SessionId, sessionIdBuf)
+	EncodeUint32(this.SessionId, sessionIdBuf)
 
 	snBuf := make([]byte, 4, 4)
-	znet.EncodeUint32(this.SN, snBuf)
+	EncodeUint32(this.SN, snBuf)
 
 	timeBuf := make([]byte, 8, 8)
-	znet.EncodeUint64(this.Time, timeBuf)
+	EncodeUint64(this.Time, timeBuf)
 
 	messageTypeBuf := make([]byte, 1, 1)
-	znet.EncodeUint8(this.MessageType, messageTypeBuf)
+	EncodeUint8(this.MessageType, messageTypeBuf)
 
 	messageIdBuf := make([]byte, 2, 2)
-	znet.EncodeUint16(this.MessageId, messageIdBuf)
+	EncodeUint16(this.MessageId, messageIdBuf)
 
 
 	index := 0
@@ -125,7 +121,7 @@ func (this *udpBuffer) DeCode() bool {
 	bufferSize := len(this.buffer)
 
 	if bufferSize >= 2 {
-		this.DataSize = znet.DecodeUint16(this.buffer[index:])
+		this.DataSize = DecodeUint16(this.buffer[index:])
 		index += 2
 
 		if bufferSize != (int(this.DataSize) + UDP_PACKET_HEAD_SIZE) {
@@ -135,19 +131,19 @@ func (this *udpBuffer) DeCode() bool {
 		return false
 	}
 
-	this.SessionId = znet.DecodeUint32(this.buffer[index:])
+	this.SessionId = DecodeUint32(this.buffer[index:])
 	index += 4
 
-	this.SN = znet.DecodeUint32(this.buffer[index:])
+	this.SN = DecodeUint32(this.buffer[index:])
 	index += 4
 
-	this.Time = znet.DecodeUint64(this.buffer[index:])
+	this.Time = DecodeUint64(this.buffer[index:])
 	index += 8
 
-	this.MessageType = znet.DecodeUint8(this.buffer[index:])
+	this.MessageType = DecodeUint8(this.buffer[index:])
 	index += 1
 
-	this.MessageId = znet.DecodeUint16(this.buffer[index:])
+	this.MessageId = DecodeUint16(this.buffer[index:])
 
 
 	if this.MessageType != UDP_MESSAGE_TYPE_ACK {

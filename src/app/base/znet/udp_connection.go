@@ -1,4 +1,4 @@
-package sudp
+package znet
 
 import (
 	"fmt"
@@ -22,8 +22,11 @@ type udpConnection struct {
 
 	isConnected bool
 	service *udpService
+	wg sync.WaitGroup
 
 	closeChan chan struct{}
+
+	sendMsgQueue chan *udpBuffer
 }
 
 func NewUdpConnection(addr *net.UDPAddr, session_id uint32, service *udpService) *udpConnection {
@@ -39,24 +42,46 @@ func NewUdpConnection(addr *net.UDPAddr, session_id uint32, service *udpService)
 		closeChan: make(chan struct{}),
 		sendMutex: &sync.Mutex{},
 		awaitMutex: &sync.Mutex{},
+		sendMsgQueue: make(chan *udpBuffer, 1024),
 	}
+
+	t.wg.Add(1)
 	go t.checkOutTime()
+
+	t.wg.Add(1)
+	go t.sendLoop()
+
 	return t
+}
+
+func (this *udpConnection) sendLoop() {
+	for this.isConnected == true {
+		select {
+		case pack := <- this.sendMsgQueue:
+			this.send(pack)
+
+		case <-this.closeChan:
+			goto exit
+		}
+	}
+exit:
+	this.wg.Done()
+	fmt.Printf("udpConnection sendLoop exit \n")
 }
 
 func (this *udpConnection) checkOutTime() {
 	timer := time.NewTicker(time.Duration(SEND_MESSAGE_TIMEOUT_MS) * time.Millisecond)
 
-	running := true
-	for running == true {
+	for this.isConnected {
 		select {
 		case <-timer.C:
 			this.handleTimeoutPackage()
 		case <-this.closeChan:
-			running = false
+			goto exit
 		}
 	}
-
+exit:
+	this.wg.Done()
 	fmt.Printf("checkOutTime exit \n")
 }
 
@@ -73,9 +98,9 @@ func (this *udpConnection) handleTimeoutPackage() {
 
 	now := time.Now().Unix()
 
-	for sessionId, buffer := range tmpMap {
+	for _, buffer := range tmpMap {
 		if buffer.reSendCount >= 10 {
-			this.service.removeClient(sessionId)
+			this.close()
 			return
 		}
 
@@ -83,14 +108,28 @@ func (this *udpConnection) handleTimeoutPackage() {
 			buffer.reSendCount += 1
 
 			fmt.Printf("超时重发: (sn:%d) (message_id:%d) \n", buffer.SN, buffer.MessageId)
-			_ = this.service.sendMessage(this.addr, buffer)
+			if err := this.service.sendMessage(this.addr, buffer); err != nil {
+				this.close()
+			}
 		}
 
 	}
 }
 
 func (this *udpConnection) close() {
+
 	this.isConnected = false
+	close(this.closeChan)
+
+	go func() {
+		this.wg.Done()
+		this.service.removeClient(this.sessionId)
+
+		close(this.sendMsgQueue)
+
+		fmt.Printf("udpConnection close %d \n", this.sessionId)
+	}()
+
 }
 
 func (this *udpConnection) onRecvMessage(buffer *udpBuffer) {
@@ -129,14 +168,20 @@ func (this *udpConnection) handleLogicPackage(buffer *udpBuffer) {
 	if _, exists := this.awaitPackageMap[this.handleSN + 1]; exists {
 		this.handleLogicPackage(this.awaitPackageMap[this.handleSN + 1])
 
-
 		this.awaitMutex.Lock()
 		defer this.awaitMutex.Unlock()
 		delete(this.awaitPackageMap, this.handleSN + 1)
 	}
 }
 
-func (this *udpConnection) Send(buffer *udpBuffer) {
+func (this *udpConnection) sendMessage(buffer *udpBuffer) {
+	select {
+	case this.sendMsgQueue <- buffer:
+	case <- this.closeChan:
+	}
+}
+
+func (this *udpConnection) send(buffer *udpBuffer) {
 	if this.isConnected == false {
 		return
 	}

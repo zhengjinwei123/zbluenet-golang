@@ -36,7 +36,7 @@ func NewTcpReactor(serv *TcpServer) *TcpReactor {
 }
 
 
-func (this *TcpReactor) GetNetId() int64 {
+func (this *TcpReactor) GetNetId() uint32 {
 	return this.tcp_conn.id
 }
 
