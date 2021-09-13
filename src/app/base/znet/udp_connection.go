@@ -86,19 +86,35 @@ func (this *udpConnection) checkOutTime() {
 
 
 func (this *udpConnection) handleTimeoutPackage() {
-
 	// copy
 	this.sendMutex.Lock()
 	tmpMap := make(map[uint32]*udpBuffer, len(this.sendedPackageMap))
 	for sessionId, buffer := range this.sendedPackageMap {
-		tmpMap[sessionId] = buffer
+		tmpMap[sessionId] = &udpBuffer{
+			DataSize: buffer.DataSize,
+			SessionId: buffer.SessionId,
+			SN: buffer.SN,
+			MessageType: buffer.MessageType,
+			MessageId: buffer.MessageId,
+			Time: buffer.Time,
+			reSendCount: buffer.reSendCount,
+			isFull: buffer.isFull,
+		}
+		tmpMap[sessionId].Data = make([]byte, len(buffer.Data), len(buffer.Data))
+		copy(tmpMap[sessionId].Data, buffer.Data)
 	}
 	this.sendMutex.Unlock()
 
 	now := time.Now().Unix()
 
 	for _, buffer := range tmpMap {
+
+		fmt.Printf("定时器处理 %d, %d\n", buffer.SessionId, buffer.reSendCount)
+
 		if buffer.reSendCount >= 10 {
+
+			fmt.Printf("重发超过10次，关闭连接 %d\n", buffer.SessionId)
+
 			this.close()
 			return
 		}
@@ -139,6 +155,10 @@ func (this *udpConnection) onRecvMessage(buffer *udpBuffer) {
 		defer this.sendMutex.Unlock()
 		delete(this.sendedPackageMap, buffer.SN)
 	} else {
+		// ack
+		ackBuffer := NewAckUpdBuffer(buffer)
+		go this.sendAck(ackBuffer)
+
 		// 业务报文
 		this.handleLogicPackage(buffer)
 	}
@@ -179,6 +199,13 @@ func (this *udpConnection) sendMessage(buffer *udpBuffer) {
 	case this.sendMsgQueue <- buffer:
 	case <- this.closeChan:
 	}
+}
+
+func (this *udpConnection) sendAck(buffer *udpBuffer) {
+	if this.isConnected == false {
+		return
+	}
+	_ = this.service.sendMessage(this.addr, buffer)
 }
 
 func (this *udpConnection) send(buffer *udpBuffer) {

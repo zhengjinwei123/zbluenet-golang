@@ -2,19 +2,20 @@ package znet
 
 import "sync"
 
-type UdpLogicServer interface {
+type IUdpLogicServer interface {
 	OnConnect(sessionId uint32, addr string)
 	OnDisconnect(sessionId uint32, addr string)
-	OnMessage(sessionId uint32, messageId uint16, data []byte)
+	OnMessage(sessionId uint32, message_id uint16, data []byte)
+	OnInit(server *UdpServer)
 }
 
 type UdpServer struct {
 	service *udpService
-	logicServer UdpLogicServer
+	logicServer IUdpLogicServer
 	wg *sync.WaitGroup
 }
 
-func NewUdpServer(logicServ UdpLogicServer) *UdpServer {
+func NewUdpServer(logicServ IUdpLogicServer) *UdpServer {
 	return &UdpServer{
 		service: NewUdpService(),
 		logicServer: logicServ,
@@ -27,6 +28,8 @@ func (this *UdpServer) GetListenAddress() string {
 }
 
 func (this *UdpServer) CreateServer(host string, port int) error {
+	this.logicServer.OnInit(this)
+
 	return this.service.CreateServer(host, port, this)
 }
 
@@ -49,10 +52,11 @@ func (this *UdpServer) onClose(sessionId uint32, addr string) {
 }
 
 // 这个接口是并发的
-func (this *UdpServer) onMessage(sessionId uint32, messageId uint16, data []byte) {
-	this.logicServer.OnMessage(sessionId, messageId, data)
+func (this *UdpServer) onMessage(sessionId uint32, message_id uint16, data []byte) {
+	this.logicServer.OnMessage(sessionId, message_id, data)
 }
 
 func (this *UdpServer) SendMessage(sessionId uint32, message_id uint16, data []byte) {
 	this.service.SendMessageToSession(sessionId, message_id, data)
 }
+

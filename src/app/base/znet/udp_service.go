@@ -127,6 +127,7 @@ func (this *udpService) handleConn(addr *net.UDPAddr, data []byte, size int) {
 	if buffer.SessionId < MIN_NET_ID {
 		// 如果 sessionid < MIN_NET_ID , 说明是连接请求， 分配一个net_id, 然后放到包体中
 		id := this.net_id_allocator.NextId()
+
 		buffer.SessionId = id
 
 		this.createConnection(addr, buffer.SessionId)

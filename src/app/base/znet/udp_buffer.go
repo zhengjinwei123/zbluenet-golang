@@ -74,22 +74,28 @@ func (this *udpBuffer) Encode(is_ack bool) []byte {
 	data := make([]byte, UDP_PACKET_HEAD_SIZE + this.DataSize)
 
 	dataSizeBuf := make([]byte, 2, 2)
-	EncodeUint16(this.DataSize, dataSizeBuf)
+	binary.LittleEndian.PutUint16(dataSizeBuf, this.DataSize)
+	//EncodeUint16(this.DataSize, dataSizeBuf)
 
 	sessionIdBuf := make([]byte, 4, 4)
-	EncodeUint32(this.SessionId, sessionIdBuf)
+	binary.LittleEndian.PutUint32(sessionIdBuf, this.SessionId)
+	//EncodeUint32(this.SessionId, sessionIdBuf)
 
 	snBuf := make([]byte, 4, 4)
-	EncodeUint32(this.SN, snBuf)
+	binary.LittleEndian.PutUint32(snBuf, this.SN)
+	//EncodeUint32(this.SN, snBuf)
 
 	timeBuf := make([]byte, 8, 8)
-	EncodeUint64(this.Time, timeBuf)
+	binary.LittleEndian.PutUint64(timeBuf, this.Time)
+	//EncodeUint64(this.Time, timeBuf)
 
 	messageTypeBuf := make([]byte, 2, 2)
-	EncodeUint16(this.MessageType, messageTypeBuf)
+	binary.LittleEndian.PutUint16(messageTypeBuf, this.MessageType)
+	//EncodeUint16(this.MessageType, messageTypeBuf)
 
 	messageIdBuf := make([]byte, 2, 2)
-	EncodeUint16(this.MessageId, messageIdBuf)
+	binary.LittleEndian.PutUint16(messageIdBuf, this.MessageId)
+	//EncodeUint16(this.MessageId, messageIdBuf)
 
 
 	index := 0

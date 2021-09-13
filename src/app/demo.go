@@ -11,21 +11,26 @@ import (
 )
 
 type BattleServer struct {
-
+	agent *znet.UdpServer
 }
 
 func (this *BattleServer) OnConnect(sessionId uint32, addr string) {
 	fmt.Printf("BattleServer OnConnect [%d] [%s] \n", sessionId, addr)
 }
 
-func (this *BattleServer) OnMessage(sessionId uint32, messageId uint16, data []byte) {
-	fmt.Printf("BattleServer OnMessage [%d] [%d] [%s] \n", sessionId, messageId, string(data))
+func (this *BattleServer) OnMessage(sessionId uint32, message_id uint16, data []byte) {
+	fmt.Printf("BattleServer OnMessage [%d] [%d] [%s] \n", sessionId, message_id, string(data))
+
+	//this.agent.SendMessage()
 }
 
 func (this *BattleServer) OnDisconnect(sessionId uint32, remoteAddr string) {
 	fmt.Printf("BattleServer OnDisconnect [%d] [%s] \n", sessionId, remoteAddr)
 }
 
+func (this *BattleServer) OnInit(server *znet.UdpServer) {
+	this.agent = server
+}
 
 
 type ZoneServer struct {
